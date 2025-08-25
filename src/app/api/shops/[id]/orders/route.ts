@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-// GET /api/shops/:id/orders -> list latest orders for a shop
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const shopId = params.id;
+export async function GET(req: NextRequest, ctx: any) {
+  try {
+    const { id } = ctx.params as { id: string };
 
-  const orders = await db.order.findMany({
-    where: { shopId },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      items: { include: { product: true, variant: true } },
-    },
-  });
+    const orders = await db.order.findMany({
+      where: { shopId: id },
+      include: { items: { include: { product: true, variant: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
 
-  return NextResponse.json(orders);
+    return NextResponse.json(orders, { status: 200 });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
 }
