@@ -4,12 +4,12 @@ import { z } from 'zod';
 
 const PatchSchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  address1: z.string().optional().nullable(),
-  address2: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  postalCode: z.string().optional().nullable(),
+  description: z.string().optional(),     // no nulls
+  phone: z.string().optional(),           // no nulls
+  address1: z.string().optional(),        // no nulls
+  address2: z.string().optional(),        // treat as empty string if you want to clear
+  city: z.string().optional(),
+  postalCode: z.string().optional(),
   isActive: z.boolean().optional(),
   deliveryMethod: z.enum(['PICKUP', 'DELIVERY', 'BOTH']).optional(),
   deliveryFeeCents: z.number().int().nonnegative().optional(),
@@ -33,11 +33,16 @@ export async function GET(req: NextRequest, ctx: any) {
 export async function PATCH(req: NextRequest, ctx: any) {
   try {
     const { id } = ctx.params as { id: string };
-    const data = PatchSchema.parse(await req.json());
+    const parsed = PatchSchema.parse(await req.json());
+
+    // Only include provided keys
+    const data = Object.fromEntries(
+      Object.entries(parsed).filter(([, v]) => v !== undefined)
+    );
 
     const updated = await db.shop.update({
       where: { id },
-      data,
+      data, // all strings/booleans/numbers, no nulls
     });
 
     return NextResponse.json(updated, { status: 200 });
