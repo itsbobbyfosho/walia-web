@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { db } from '@/lib/db';
+import { z } from 'zod';
 
-const BodySchema = z.object({
+// --- Update order status (used by OrderStatusControl) ---
+const PatchSchema = z.object({
   status: z.enum([
     'RECEIVED',
     'PREPARING',
@@ -13,15 +14,15 @@ const BodySchema = z.object({
   ]),
 });
 
-// PATCH /api/orders/:id  -> { status: "PREPARING" }
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, ctx: any) {
   try {
-    const { status } = BodySchema.parse(await req.json());
+    const { id } = ctx.params as { id: string };
+    const { status } = PatchSchema.parse(await req.json());
 
     const order = await db.order.update({
-      where: { id: params.id },
+      where: { id },
       data: { status },
-      include: { items: true },
+      include: { items: { include: { product: true, variant: true } } },
     });
 
     return NextResponse.json(order, { status: 200 });
@@ -30,6 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: err.flatten() }, { status: 400 });
     }
     if (err?.code === 'P2025') {
+      // Prisma record not found
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
     console.error(err);
@@ -37,13 +39,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
+// --- Get a single order (used by /orders/[id]) ---
+export async function GET(req: NextRequest, ctx: any) {
   try {
+    const { id } = ctx.params as { id: string };
     const order = await db.order.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { items: { include: { product: true, variant: true } } },
     });
     if (!order) {

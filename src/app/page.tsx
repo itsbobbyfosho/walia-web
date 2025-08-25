@@ -1,5 +1,6 @@
 // src/app/page.tsx
 import Link from "next/link";
+import { baseUrl } from "@/lib/env";
 
 type Shop = {
   id: string;
@@ -9,7 +10,7 @@ type Shop = {
 };
 
 async function getShops(): Promise<Shop[]> {
-  const res = await fetch("http://localhost:3000/api/shops", { cache: "no-store" });
+  const res = await fetch(`${baseUrl()}/api/shops`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load shops");
   return res.json();
 }

@@ -1,4 +1,5 @@
 // src/app/shop/[slug]/page.tsx
+import { baseUrl } from "@/lib/env";
 import AddToCartButton from "@/components/AddToCartButton";
 
 type Product = {
@@ -17,7 +18,7 @@ type ShopResp = {
 };
 
 async function getShop(slug: string): Promise<ShopResp> {
-  const res = await fetch(`http://localhost:3000/api/shops/by-slug/${slug}`, {
+  const res = await fetch(`${baseUrl()}/api/shops/by-slug/${slug}`, {
     cache: "no-store",
   });
   if (!res.ok) {
