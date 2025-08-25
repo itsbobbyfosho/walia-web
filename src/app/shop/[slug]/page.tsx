@@ -30,9 +30,10 @@ async function getShop(slug: string): Promise<ShopResp> {
 export default async function ShopPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const shop = await getShop(params.slug);
+  const { slug } = await params;
+  const shop = await getShop(slug);
 
   return (
     <main className="max-w-3xl mx-auto p-6 space-y-6">

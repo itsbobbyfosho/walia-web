@@ -51,9 +51,10 @@ function fmtDate(iso: string) {
 export default async function OrderPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const order = await getOrder(params.id);
+  const { id } = await params;
+  const order = await getOrder(id);
 
   return (
     <main className="max-w-3xl mx-auto p-6 space-y-6">
@@ -65,9 +66,7 @@ export default async function OrderPage({
       </div>
 
       <div className="text-sm text-gray-700 space-y-1">
-        <div>
-          Status: <span className="font-medium">{order.status}</span>
-        </div>
+        <div> Status: <span className="font-medium">{order.status}</span></div>
         <div>Placed: {fmtDate(order.createdAt)}</div>
         <div>Method: {order.deliveryMethod}</div>
         {order.deliveryMethod === "DELIVERY" && (
