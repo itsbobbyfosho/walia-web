@@ -9,13 +9,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { customerId } = CartSchema.parse(body);
 
+    // ensure customer exists
     const customer = await db.profile.findUnique({ where: { id: customerId } });
     if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 400 });
 
-    let cart = await db.cart.findFirst({ where: { customerId }, include: { items: true } });
+    // find or create cart
+    let cart = await db.cart.findFirst({
+      where: { customerId },
+      include: { items: { include: { product: true, variant: true } } },
+    });
     if (!cart) {
-      cart = await db.cart.create({ data: { customerId }, include: { items: true } });
+      cart = await db.cart.create({
+        data: { customerId },
+        include: { items: { include: { product: true, variant: true } } },
+      });
     }
+
     return NextResponse.json(cart, { status: 201 });
   } catch (err: any) {
     if (err?.name === 'ZodError') {
@@ -31,7 +40,11 @@ export async function GET(req: NextRequest) {
   const customerId = searchParams.get('customerId');
   if (!customerId) return NextResponse.json({ error: 'customerId required' }, { status: 400 });
 
-  const cart = await db.cart.findFirst({ where: { customerId }, include: { items: true } });
+  const cart = await db.cart.findFirst({
+    where: { customerId },
+    include: { items: { include: { product: true, variant: true } } },
+  });
+
   if (!cart) return NextResponse.json({ id: null, items: [] }, { status: 200 });
 
   return NextResponse.json(cart, { status: 200 });

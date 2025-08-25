@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const intent = await stripe.paymentIntents.create({
       amount: order.totalCents,
       currency: 'cad',
-      automatic_payment_methods: { enabled: true },
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
       metadata: { orderId: order.id, shopId: order.shopId },
     });
 
