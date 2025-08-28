@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-export const runtime = 'nodejs'; // ensure Prisma runs on Node, not Edge
+export const runtime = 'nodejs';       // run on Node (needed for Prisma)
+export const dynamic = 'force-dynamic'; // avoid build-time execution
 
 export async function GET(_req: NextRequest) {
   try {
@@ -29,8 +30,11 @@ export async function GET(_req: NextRequest) {
       },
     });
     return NextResponse.json(shops, { status: 200 });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } catch (e: any) {
+    // Return the real error so we can see it in the browser (temporary for debugging)
+    return NextResponse.json(
+      { error: String(e?.message ?? e) },
+      { status: 500 }
+    );
   }
 }
