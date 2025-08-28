@@ -3,6 +3,8 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 
 export const runtime = "nodejs"; // ensure Prisma runs in Node on Vercel
+export const dynamic = "force-dynamic"; // 
+
 
 export default async function Home() {
   const shops = await db.shop.findMany({
