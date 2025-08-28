@@ -1,63 +1,36 @@
+// src/app/api/shops/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { db } from '@/lib/db';
 
-const ShopSchema = z.object({
-  ownerId: z.string().uuid(),
-  name: z.string().min(2),
-  slug: z.string().min(2).regex(/^[a-z0-9-]+$/),
-  description: z.string().optional(),
-  phone: z.string().optional(),
-  address1: z.string().min(3),
-  address2: z.string().optional(),
-  city: z.string().min(2),
-  postalCode: z.string().min(3),
-  deliveryMethod: z.enum(['PICKUP', 'DELIVERY', 'BOTH']).optional(),
-  deliveryFeeCents: z.number().int().nonnegative().optional(),
-});
+export const runtime = 'nodejs'; // ensure Prisma runs on Node, not Edge
 
-export async function POST(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const body = await req.json();
-    const data = ShopSchema.parse(body);
-
-    const owner = await db.profile.findUnique({ where: { id: data.ownerId } });
-    if (!owner) return NextResponse.json({ error: 'Owner not found' }, { status: 400 });
-
-    const existing = await db.shop.findUnique({ where: { slug: data.slug } });
-    if (existing) return NextResponse.json({ error: 'Slug already in use' }, { status: 409 });
-
-    const shop = await db.shop.create({
-      data: {
-        ownerId: data.ownerId,
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        phone: data.phone,
-        address1: data.address1,
-        address2: data.address2,
-        city: data.city,
-        postalCode: data.postalCode,
-        deliveryMethod: data.deliveryMethod ?? 'BOTH',
-        deliveryFeeCents: data.deliveryFeeCents ?? 0,
-        isActive: false,
+    const shops = await db.shop.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        ownerId: true,
+        name: true,
+        slug: true,
+        description: true,
+        phone: true,
+        address1: true,
+        address2: true,
+        city: true,
+        postalCode: true,
+        isActive: true,
+        deliveryMethod: true,
+        deliveryFeeCents: true,
+        commissionBps: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
-
-    return NextResponse.json(shop, { status: 201 });
-  } catch (err: any) {
-    if (err?.name === 'ZodError') {
-      return NextResponse.json({ error: err.flatten() }, { status: 400 });
-    }
+    return NextResponse.json(shops, { status: 200 });
+  } catch (err) {
     console.error(err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
-}
-
-export async function GET() {
-  const shops = await db.shop.findMany({
-    where: { isActive: true },
-    orderBy: { createdAt: 'desc' },
-  });
-  return NextResponse.json(shops);
 }
