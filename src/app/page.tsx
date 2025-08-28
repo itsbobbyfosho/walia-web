@@ -1,22 +1,15 @@
 // src/app/page.tsx
 import Link from "next/link";
-import { baseUrl } from "@/lib/env";
+import { db } from "@/lib/db";
 
-type Shop = {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-};
-
-async function getShops(): Promise<Shop[]> {
-  const res = await fetch(`${baseUrl()}/api/shops`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to load shops");
-  return res.json();
-}
+export const runtime = "nodejs"; // ensure Prisma runs in Node on Vercel
 
 export default async function Home() {
-  const shops = await getShops();
+  const shops = await db.shop.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, slug: true, description: true },
+    orderBy: { createdAt: "desc" },
+  });
 
   return (
     <main className="max-w-2xl mx-auto p-6 space-y-4">
