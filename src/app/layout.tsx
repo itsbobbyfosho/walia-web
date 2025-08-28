@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   description: "Ethiopian shops in Calgary",
 };
 
+// Force Node runtime for everything under this layout
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
