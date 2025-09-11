@@ -1,75 +1,83 @@
 // src/app/orders/page.tsx
-import Link from "next/link";
+'use client';
 
-type OrderItem = { id: string; qty: number };
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 type Order = {
   id: string;
   status: string;
-  deliveryMethod: 'PICKUP' | 'DELIVERY';
   totalCents: number;
+  currency: string;
   createdAt: string;
-  items: OrderItem[];
 };
 
-const CUSTOMER_ID = "f53f12f6-19a6-45a6-a71f-e35b11291ab6"; // TEMP until auth
+const CUSTOMER_ID = process.env.NEXT_PUBLIC_CUSTOMER_ID as string;
 
-async function getOrders(): Promise<Order[]> {
-  const res = await fetch(
-    `http://localhost:3000/api/orders?customerId=${CUSTOMER_ID}`,
-    { cache: "no-store" }
-  );
-  if (!res.ok) throw new Error("Failed to load orders");
-  return res.json();
-}
+export default function OrdersPage() {
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-function fmtMoney(cents: number) {
-  return `$${(cents / 100).toFixed(2)} CAD`;
-}
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!CUSTOMER_ID) throw new Error('Missing NEXT_PUBLIC_CUSTOMER_ID');
+        const res = await fetch(`/api/orders?customerId=${encodeURIComponent(CUSTOMER_ID)}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`Failed to load orders (${res.status})${text ? `: ${text}` : ''}`);
+        }
+        const data: Order[] = await res.json();
+        setOrders(data);
+      } catch (e: any) {
+        setError(String(e?.message ?? e));
+      }
+    })();
+  }, []);
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString("en-CA", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+  if (error) {
+    return (
+      <main className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-3">Your Orders</h1>
+        <pre className="text-sm text-red-600 whitespace-pre-wrap">{error}</pre>
+      </main>
+    );
+  }
 
-export default async function OrdersPage() {
-  const orders = await getOrders();
+  if (!orders) {
+    return (
+      <main className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-3">Your Orders</h1>
+        <p className="text-gray-600">Loading…</p>
+      </main>
+    );
+  }
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
+    <main className="max-w-3xl mx-auto p-6 space-y-4">
       <h1 className="text-2xl font-semibold">Your Orders</h1>
-
       {orders.length === 0 ? (
         <p className="text-gray-600">No orders yet.</p>
       ) : (
         <ul className="space-y-3">
           {orders.map((o) => (
             <li key={o.id} className="border rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <Link
-                  href={`/orders/${o.id}`}
-                  className="font-medium underline underline-offset-4"
-                >
-                  Order #{o.id.slice(0, 8)}
-                </Link>
-                <div className="text-sm text-gray-600">{fmtDate(o.createdAt)}</div>
+              <div className="font-medium">Order {o.id.slice(0, 8)}…</div>
+              <div className="text-sm text-gray-600">
+                Placed: {new Date(o.createdAt).toLocaleString()}
               </div>
-              <div className="mt-1 text-sm">
-                Status: <span className="font-medium">{o.status}</span> · Method:{" "}
-                <span className="font-medium">{o.deliveryMethod}</span> · Items:{" "}
-                <span className="font-medium">{o.items.length}</span>
+              <div className="text-sm">Status: {o.status}</div>
+              <div className="text-sm">
+                Total: ${(o.totalCents / 100).toFixed(2)} {o.currency}
               </div>
-              <div className="mt-2 font-semibold">{fmtMoney(o.totalCents)}</div>
-              <div className="mt-2">
-                <Link href={`/orders/${o.id}`} className="text-sm underline">
-                  View details →
-                </Link>
-              </div>
+              <Link
+                href={`/orders/${o.id}`}
+                className="inline-block mt-2 underline"
+              >
+                View details
+              </Link>
             </li>
           ))}
         </ul>
