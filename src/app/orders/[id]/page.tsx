@@ -1,116 +1,128 @@
 // src/app/orders/[id]/page.tsx
-import Link from "next/link";
-import OrderStatusControl from "../../../components/OrderStatusControl";
+'use client';
+
+import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import OrderStatusControl from '@/components/OrderStatusControl';
 
 type OrderItem = {
   id: string;
+  productId: string;
+  variantId: string | null;
   qty: number;
   unitPriceCents: number;
-  product: { name: string };
+  product?: {
+    name?: string;
+  } | null;
 };
 
 type Order = {
   id: string;
+  shopId: string;
+  customerId: string;
   status: string;
-  deliveryMethod: "PICKUP" | "DELIVERY";
-  totalCents: number;
   subtotalCents: number;
-  taxCents: number;
+  taxCents: number | null;
   deliveryFeeCents: number | null;
+  totalCents: number;
   currency: string;
+  deliveryMethod: string;
+  address1: string | null;
+  address2: string | null;
+  city: string | null;
+  postalCode: string | null;
+  placedAt: string | null;
   createdAt: string;
-  address1?: string | null;
-  address2?: string | null;
-  city?: string | null;
-  postalCode?: string | null;
+  updatedAt: string;
   items: OrderItem[];
 };
 
-async function getOrder(id: string): Promise<Order> {
-  const res = await fetch(`http://localhost:3000/api/orders/${id}`, {
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error("Order not found");
-  return res.json();
-}
+export default function OrderDetailsPage() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id?.toString() ?? '';
 
-function money(cents: number) {
-  return `$${(cents / 100).toFixed(2)} CAD`;
-}
+  const [order, setOrder] = useState<Order | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString("en-CA", {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+  async function load() {
+    try {
+      setBusy(true);
+      const res = await fetch(`/api/orders/${encodeURIComponent(id)}`, { cache: 'no-store' });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Failed to load order (${res.status})${text ? `: ${text}` : ''}`);
+      }
+      const data: Order = await res.json();
+      setOrder(data);
+      setError(null);
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
-export default async function OrderPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const order = await getOrder(id);
+  useEffect(() => {
+    if (id) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  if (error) {
+    return (
+      <main className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-3">Order</h1>
+        <pre className="text-sm text-red-600 whitespace-pre-wrap">{error}</pre>
+      </main>
+    );
+  }
+
+  if (!order) {
+    return (
+      <main className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-3">Order</h1>
+        <p className="text-gray-600">{busy ? 'Loading…' : 'Not found'}</p>
+      </main>
+    );
+  }
+
+  const lineTotal = (it: OrderItem) => ((it.qty * it.unitPriceCents) / 100).toFixed(2);
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Order #{order.id.slice(0, 8)}</h1>
-        <Link href="/orders" className="text-sm underline">
-          Back to orders
-        </Link>
+    <main className="max-w-3xl mx-auto p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">Order {order.id.slice(0, 8)}…</h1>
+
+      <div className="text-sm text-gray-600">
+        Placed: {order.placedAt ? new Date(order.placedAt).toLocaleString() : new Date(order.createdAt).toLocaleString()}
       </div>
 
-      <div className="text-sm text-gray-700 space-y-1">
-        <div> Status: <span className="font-medium">{order.status}</span></div>
-        <div>Placed: {fmtDate(order.createdAt)}</div>
-        <div>Method: {order.deliveryMethod}</div>
-        {order.deliveryMethod === "DELIVERY" && (
-          <div className="mt-1">
-            Deliver to: {order.address1}
-            {order.address2 ? `, ${order.address2}` : ""}, {order.city} {order.postalCode}
-          </div>
-        )}
-        <div className="pt-2">
-          <OrderStatusControl orderId={order.id} current={order.status} />
-          {/* After saving, refresh the page to see the new status. */}
-        </div>
+      <div className="border rounded-xl p-4 space-y-2">
+        <div>Status: <span className="font-medium">{order.status}</span></div>
+        <OrderStatusControl
+          orderId={order.id}
+          current={order.status}
+          onUpdated={load}
+        />
       </div>
 
-      <ul className="divide-y rounded-xl border">
-        {order.items.map((i) => (
-          <li key={i.id} className="p-4 flex items-center justify-between">
-            <div>
-              <div className="font-medium">{i.product.name}</div>
-              <div className="text-sm text-gray-600">Qty: {i.qty}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-700">Unit: {money(i.unitPriceCents)}</div>
-              <div className="text-sm text-gray-600">Line: {money(i.unitPriceCents * i.qty)}</div>
-            </div>
-          </li>
-        ))}
-      </ul>
+      <div className="border rounded-xl p-4">
+        <h2 className="font-medium mb-2">Items</h2>
+        <ul className="space-y-2">
+          {order.items.map((it) => (
+            <li key={it.id} className="border rounded-lg p-3">
+              <div className="font-medium">{it.product?.name || it.productId}</div>
+              <div className="text-sm text-gray-600">Qty: {it.qty} • Unit: ${(it.unitPriceCents / 100).toFixed(2)}</div>
+              <div className="text-sm">Line: ${lineTotal(it)}</div>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-      <div className="text-right space-y-1">
-        <div className="text-sm text-gray-700">
-          Subtotal: <span className="font-medium">{money(order.subtotalCents)}</span>
-        </div>
-        <div className="text-sm text-gray-700">
-          Tax: <span className="font-medium">{money(order.taxCents)}</span>
-        </div>
-        {order.deliveryMethod === "DELIVERY" && (
-          <div className="text-sm text-gray-700">
-            Delivery: <span className="font-medium">{money(order.deliveryFeeCents || 0)}</span>
-          </div>
-        )}
-        <div className="text-lg">
-          Total: <span className="font-semibold">{money(order.totalCents)}</span>
-        </div>
+      <div className="border rounded-xl p-4 space-y-1">
+        <div>Subtotal: ${(order.subtotalCents / 100).toFixed(2)}</div>
+        {order.taxCents != null && <div>Tax: ${(order.taxCents / 100).toFixed(2)}</div>}
+        {order.deliveryFeeCents != null && <div>Delivery: ${(order.deliveryFeeCents / 100).toFixed(2)}</div>}
+        <div className="font-semibold">Total: ${(order.totalCents / 100).toFixed(2)} {order.currency}</div>
       </div>
     </main>
   );
