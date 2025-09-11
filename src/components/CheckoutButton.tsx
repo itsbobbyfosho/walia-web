@@ -3,79 +3,69 @@
 
 import { useState } from 'react';
 
-export default function CheckoutButton() {
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [debug, setDebug] = useState<{ orderId?: string; pi?: string } | null>(null);
+const CUSTOMER_ID = process.env.NEXT_PUBLIC_CUSTOMER_ID as string;
 
-  // TEMP until auth is wired
-  const CUSTOMER_ID = 'f53f12f6-19a6-45a6-a71f-e35b11291ab6';
+export default function CheckoutButton({ disabled = false }: { disabled?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function handleCheckout() {
-    setLoading(true);
-    setMsg(null);
-    setDebug(null);
     try {
-      // 1) Create order from cart (PICKUP for now)
+      setErr(null);
+      setBusy(true);
+
+      if (!CUSTOMER_ID) throw new Error('Missing NEXT_PUBLIC_CUSTOMER_ID');
+
+      // 1) Create order from the current cart
       const orderRes = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerId: CUSTOMER_ID,
-          deliveryMethod: 'PICKUP',
+          deliveryMethod: 'PICKUP', // simple default for now
         }),
       });
-
       if (!orderRes.ok) {
-        const e = await orderRes.json().catch(() => ({}));
-        throw new Error(e?.error || 'Failed to create order');
+        const text = await orderRes.text().catch(() => '');
+        throw new Error(`Create order failed (${orderRes.status}) ${text}`);
       }
+      const order = await orderRes.json(); // expects { id: string, ... }
 
-      const order = await orderRes.json();
-
-      // 2) Create PaymentIntent for that order
-      const payRes = await fetch('/api/checkout', {
+      // 2) Create Stripe PaymentIntent for that order
+      const piRes = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId: order.id }),
       });
-
-      if (!payRes.ok) {
-        const e = await payRes.json().catch(() => ({}));
-        throw new Error(e?.error || 'Failed to start checkout');
+      if (!piRes.ok) {
+        const text = await piRes.text().catch(() => '');
+        throw new Error(`Create payment failed (${piRes.status}) ${text}`);
       }
+      const pi = await piRes.json(); // { paymentIntentId, clientSecret }
 
-      const pay = await payRes.json();
-      setMsg('Order placed! Payment intent created.');
-      setDebug({ orderId: order.id, pi: pay.paymentIntentId });
-
-      // Note: For real card entry we’ll wire Stripe Elements next.
-      // In test mode, you can confirm PI via Stripe CLI like:
-      //   stripe payment_intents confirm <pi_id> -d payment_method=pm_card_visa
-    } catch (err: any) {
-      setMsg(err?.message || 'Checkout failed');
+      // 3) For now, just route user to Orders (payment is test-mode handled in Dashboard)
+      alert(`Order placed!\nOrder ID: ${order.id}\nPI: ${pi.paymentIntentId}`);
+      window.location.href = '/orders';
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
     } finally {
-      setLoading(false);
-      // keep debug visible; clear message after a bit
-      setTimeout(() => setMsg(null), 4000);
+      setBusy(false);
     }
   }
 
   return (
-    <div className="mt-6">
+    <div className="mt-4 space-y-2">
       <button
         onClick={handleCheckout}
-        disabled={loading}
-        className="inline-flex items-center rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+        disabled={busy || disabled}
+        className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
       >
-        {loading ? 'Placing order…' : 'Checkout (Pickup)'}
+        {busy ? 'Processing…' : 'Checkout'}
       </button>
-      {msg && <div className="mt-2 text-sm text-gray-700">{msg}</div>}
-      {debug?.pi && (
-        <div className="mt-1 text-xs text-gray-500">
-          Order ID: {debug.orderId} • PI: {debug.pi}
-        </div>
-      )}
+      {err && <p className="text-sm text-red-600 whitespace-pre-wrap">{err}</p>}
+      <p className="text-xs text-gray-500">
+        Test mode: after placing an order, you can confirm the payment in the Stripe Dashboard.
+      </p>
     </div>
   );
 }

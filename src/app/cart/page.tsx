@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import CheckoutButton from '@/components/CheckoutButton';
 
 type CartItem = {
   id: string;
@@ -62,7 +63,6 @@ export default function CartPage() {
     try {
       setBusy(itemId);
       if (nextQty <= 0) {
-        // remove
         const del = await fetch('/api/cart/items', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -157,6 +157,9 @@ export default function CartPage() {
         </div>
         <div className="text-sm text-gray-600">Tax & fees at checkout.</div>
       </div>
+
+      {/* Checkout */}
+      <CheckoutButton disabled={cart.items.length === 0} />
     </main>
   );
 }
